@@ -44,21 +44,40 @@ namespace make {
         Makefile &operator=(Makefile &&) noexcept = default;
 
     public:
+        std::string_view defaultTarget() const {
+            for (const auto &rule : rules()) {
+                if (!rule.isPatternRule()) {
+                    return rule.targets()[0];
+                }
+            }
+            return "all";
+        }
+
+    public:
         const std::vector<Variable> &variables() const { return _variables; }
 
         const std::vector<Include> &includes() const { return _includes; }
 
         const std::vector<Rule> &rules() const { return _rules; }
 
-        const Rule &rule(const std::string &target) const {
-            return _ruleMap.at(target);
+        const Rule &rule(const std::string &target) const { return _ruleMap.at(target); }
+        Rule patternRule(const std::string &target) const {
+            const auto &patternRule =
+                std::find_if(std::begin(_rules), std::end(_rules), [&target](const Rule &rule) {
+                    return rule.isPatternRuleMatchTo(target);
+                });
+            return patternRule->setPlaceholder(patternRule->targetToPlaceholder(target));
         }
         bool hasRuleFor(const std::string &target) const {
             return _ruleMap.find(target) != std::end(_ruleMap);
         }
+        bool hasPatternRuleFor(const std::string &target) const {
+            return std::find_if(std::begin(_rules), std::end(_rules), [&target](const Rule &rule) {
+                       return rule.isPatternRuleMatchTo(target);
+                   }) != std::end(_rules);
+        }
 
-        const std::vector<std::string> &
-        variable(const std::string &name) const {
+        const std::vector<std::string> &variable(const std::string &name) const {
             return _variableMap.at(name);
         }
         bool hasVariable(const std::string &name) const {

@@ -4,3 +4,4 @@ AccessModifierOffset: -4
 BreakConstructorInitializersBeforeComma: true
 IndentWidth: 4
 NamespaceIndentation: All
+ColumnLimit: 100

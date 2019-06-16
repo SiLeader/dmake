@@ -9,17 +9,14 @@
 #include <boost/graph/graphviz.hpp>
 
 int main(int argc, char **argv) {
-    argparse::ArgumentParser parser("make", "build tool",
-                                    "License: Apache License 2.0");
+    argparse::ArgumentParser parser("make", "build tool", "License: Apache License 2.0");
     parser.addArgument({"--makefile", "--file", "-f"}, "Makefile path");
-    parser.addArgument({"--graph"}, "show dependency graph",
-                       argparse::ArgumentType::StoreTrue);
+    parser.addArgument({"--graph"}, "show dependency graph", argparse::ArgumentType::StoreTrue);
     parser.addArgument({"--dot"}, "generate dot file and dot file path");
     parser.addArgument({"target"}, "target name");
-    parser.addArgument({"--dry-run"}, "dry run",
-                       argparse::ArgumentType::StoreTrue);
+    parser.addArgument({"--dry-run"}, "dry run", argparse::ArgumentType::StoreTrue);
 
-    auto args = parser.parseArgs(argc, argv);
+    auto args = parser.parseArgs(argc, argv, true);
 
     auto makeString = make::loadMakefile("Makefile");
     auto makefile = make::lexer(makeString);
@@ -33,11 +30,12 @@ int main(int argc, char **argv) {
         auto dg = make::createDependGraph(makefile.rules(), {});
         const auto &[graph, names] = dg;
         std::ofstream fout(args.get<std::string>("dot"));
-        boost::write_graphviz(fout, graph,
-                              boost::make_label_writer(names.data()));
+        boost::write_graphviz(fout, graph, boost::make_label_writer(names.data()));
 
     } else {
-        const auto target = args.safeGet<std::string>("target", "main");
+        std::string defaultTarget(makefile.defaultTarget());
+
+        const auto target = args.safeGet<std::string>("target", defaultTarget);
         make::runBuild(target, makefile, args.has("dry-run"));
     }
     return 0;

@@ -11,75 +11,51 @@
 #include "../variables.hpp"
 
 namespace {
-    bool isMatchToPattern(const std::string &target, std::string pattern) {
-        boost::algorithm::replace_all(pattern, ".", "\\.");
-        boost::algorithm::replace_all(pattern, "+", "\\+");
-        boost::algorithm::replace_all(pattern, "*", "\\*");
-        boost::algorithm::replace_all(pattern, "^", "\\^");
-        boost::algorithm::replace_all(pattern, "|", "\\|");
-        boost::algorithm::replace_all(pattern, "$", "\\$");
-        boost::algorithm::replace_all(pattern, "\\", "\\\\");
-        boost::algorithm::replace_all(pattern, "%", ".+");
-        pattern = "^" + pattern + "$";
-
-        return std::regex_match(target, std::regex(pattern));
-    }
-
-    void scheduleBuildImpl(std::shared_ptr<make::Phase> &phase,
-                           const std::string &target,
-                           const make::Makefile &makefile,
-                           const make::DependGraph &dependGraph) {
+    void scheduleBuildImpl(std::shared_ptr<make::Phase> &phase, const std::string &target,
+                           const make::Makefile &makefile, const make::DependGraph &dependGraph) {
         const auto &[graph, fileNames] = dependGraph;
-        const auto targetIndex =
-            std::find(std::begin(fileNames), std::end(fileNames), target) -
-            std::begin(fileNames);
 
         std::vector<std::shared_ptr<make::Phase>> subPhases;
 
-        for (const auto &edge : graph.out_edge_list(targetIndex)) {
-            subPhases.emplace_back();
-            const auto &file = fileNames[edge.get_target()];
-            scheduleBuildImpl(subPhases.back(), file, makefile, dependGraph);
-        }
-
         std::vector<make::Command> commands;
+        std::optional<make::Rule> rule;
         if (makefile.hasRuleFor(target)) {
-            for (const auto &command : makefile.rule(target).commands()) {
-                // system(command.command().c_str());
-                // std::cout << command.command() << std::endl;
-                commands.emplace_back(command);
+            rule = makefile.rule(target);
+        } else if (makefile.hasPatternRuleFor(target)) {
+            rule = makefile.patternRule(target);
+        }
+
+        if (rule.has_value()) {
+            for (auto commandInfo : (*rule).commands()) {
+                auto &command = commandInfo.command();
+                {
+                    const auto &dependencies = rule->dependencies();
+                    if (std::size(dependencies))
+                        boost::algorithm::replace_all(command, "$<", dependencies[0]);
+                    boost::algorithm::replace_all(command, "$^",
+                                                  boost::algorithm::join(dependencies, " "));
+                }
+                {
+                    const auto &targets = rule->targets();
+                    boost::algorithm::replace_all(command, "$@", targets[0]);
+                }
+                commands.emplace_back(commandInfo);
+            }
+
+            for (const auto &dep : rule->dependencies()) {
+                subPhases.emplace_back();
+                scheduleBuildImpl(subPhases.back(), dep, makefile, dependGraph);
             }
         }
+
         phase = make::Phase::CreatePhase(commands, subPhases);
-    }
-
-    void runBuildImpl(const std::string &target, const make::Makefile &makefile,
-                      const make::DependGraph &dependGraph) {
-        const auto &[graph, fileNames] = dependGraph;
-        const auto targetIndex =
-            std::find(std::begin(fileNames), std::end(fileNames), target) -
-            std::begin(fileNames);
-
-        for (const auto &edge : graph.out_edge_list(targetIndex)) {
-            const auto &file = fileNames[edge.get_target()];
-            runBuildImpl(file, makefile, dependGraph);
-        }
-
-        if (makefile.hasRuleFor(target)) {
-            for (const auto &command : makefile.rule(target).commands()) {
-                system(command.command().c_str());
-                // std::cout << command.command() << std::endl;
-            }
-        }
     }
 } // namespace
 
 namespace make {
-    void runBuild(const std::string &target, const Makefile &makefile,
-                  bool dryRun) {
+    void runBuild(const std::string &target, const Makefile &makefile, bool dryRun) {
         auto dg = make::createDependGraph(makefile.rules(), {});
 
-        // runBuildImpl(target, makefile, dg);
         std::shared_ptr<make::Phase> phase;
         scheduleBuildImpl(phase, target, makefile, dg);
         phase->execute(dryRun);

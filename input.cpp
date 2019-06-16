@@ -13,6 +13,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include <bits/unordered_set.h>
 #include <boost/filesystem.hpp>
 namespace fs = boost::filesystem;
 
@@ -38,6 +39,26 @@ namespace {
         }
         return makefileCache[file];
     }
+
+    std::vector<std::string> parseSuffixes(const std::string &ss) {
+        std::vector<std::string> suffixes(
+            std::count(std::begin(ss), std::end(ss), '.'));
+
+        auto suffixItr = std::begin(suffixes);
+
+        const auto first = std::cbegin(ss), last = std::cend(ss);
+
+        auto offset = ss.find('.');
+        while (offset != std::string::npos) {
+            auto endOffset = ss.find('.', offset + 1);
+
+            *suffixItr = ss.substr(offset, endOffset - offset);
+
+            offset = endOffset;
+        }
+
+        return suffixes;
+    }
 } // namespace
 
 namespace make {
@@ -62,6 +83,18 @@ namespace make {
         using boost::algorithm::split_regex;
         using boost::algorithm::trim_copy;
 
+        std::unordered_set<std::string> suffixes;
+
+        const auto isRegisteredSuffixes =
+            [&suffixes](const std::vector<std::string> &targetSuffixes) {
+                for (const auto &targetSuffix : targetSuffixes) {
+                    if (suffixes.find(targetSuffix) == std::end(suffixes)) {
+                        return false;
+                    }
+                }
+                return true;
+            };
+
         std::vector<Variable> variables;
         std::vector<Include> includes;
         std::vector<Rule> rules;
@@ -69,7 +102,7 @@ namespace make {
         std::forward_list<Command> commands;
         std::optional<Rule> currentRule;
 
-        auto appendRuleIfExists = [&currentRule, &rules, &commands] {
+        const auto appendRuleIfExists = [&currentRule, &rules, &commands] {
             if (currentRule.has_value()) {
                 commands.reverse();
                 rules.emplace_back(currentRule->targets(),
@@ -160,6 +193,30 @@ namespace make {
                                                   std::end(dependencies),
                                                   std::empty<std::string>),
                                    std::end(dependencies));
+                if (std::size(targets) == 1) {
+                    auto &target = targets[0];
+
+                    if (target[0] == '.') {
+                        if (target == ".SUFFIXES") {
+                            suffixes.insert(std::begin(dependencies),
+                                            std::end(dependencies));
+
+                        } else {
+                            auto targetSuffixes = parseSuffixes(target);
+                            if (isRegisteredSuffixes(targetSuffixes)) {
+                                dependencies.clear();
+                                dependencies.emplace_back("%" +
+                                                          targetSuffixes[0]);
+                                if (std::size(targetSuffixes) == 1) {
+                                    target = "%";
+                                } else {
+                                    target = "%" + targetSuffixes[1];
+                                }
+                            }
+                        }
+                    }
+                }
+
                 currentRule = Rule(targets, dependencies, {});
 
             } else if (contains(line, "include")) {

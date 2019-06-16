@@ -2,7 +2,7 @@
 
 &copy; 2019 SiLeader and Cerussite.
 
-## abstract
+## features
 + full scratch
 + build tool for Makefile
 + distributed concurrency build (not implemented)
@@ -10,6 +10,9 @@
 + output dependency graph
   + graphviz(.dot) format
   + stdout
++ extra rule format
+  + suffix rule
+  + pattern rule
 
 ## license
 Apache License 2.0

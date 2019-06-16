@@ -16,10 +16,8 @@ namespace {
     constexpr std::string_view BRACE_REGEX_STRING = R"(\$\{(\w+)\})";
 
     std::vector<std::string> getVariableNames(const std::string &c) {
-        static const std::regex PAREN{PAREN_REGEX_STRING.data(),
-                                      PAREN_REGEX_STRING.size()};
-        static const std::regex BRACE{BRACE_REGEX_STRING.data(),
-                                      BRACE_REGEX_STRING.size()};
+        static const std::regex PAREN{PAREN_REGEX_STRING.data(), PAREN_REGEX_STRING.size()};
+        static const std::regex BRACE{BRACE_REGEX_STRING.data(), BRACE_REGEX_STRING.size()};
 
         std::size_t offset = 0;
         const auto first = std::begin(c), last = std::end(c);
@@ -36,18 +34,15 @@ namespace {
             offset += sm.position() + sm.size();
         }
 
-        return std::vector<std::string>(std::begin(variables),
-                                        std::end(variables));
+        return std::vector<std::string>(std::begin(variables), std::end(variables));
     }
 } // namespace
 
 namespace make {
 
     std::optional<std::string> getVariableName(const std::string &vn) {
-        static const std::regex PAREN{PAREN_REGEX_STRING.data(),
-                                      PAREN_REGEX_STRING.size()};
-        static const std::regex BRACE{BRACE_REGEX_STRING.data(),
-                                      BRACE_REGEX_STRING.size()};
+        static const std::regex PAREN{PAREN_REGEX_STRING.data(), PAREN_REGEX_STRING.size()};
+        static const std::regex BRACE{BRACE_REGEX_STRING.data(), BRACE_REGEX_STRING.size()};
 
         std::smatch sm;
         if (std::regex_match(vn, sm, PAREN)) {
@@ -61,14 +56,12 @@ namespace make {
 } // namespace make
 
 namespace {
-    std::vector<std::string>
-    resolveVar(const std::vector<make::Variable> &vars) {
+    std::vector<std::string> resolveVar(const std::vector<make::Variable> &vars) {
         std::vector<std::string> result;
 
         for (const auto &var : vars) {
             if (var.type() == make::Variable::Type::Append) {
-                result.insert(std::end(result), std::begin(var.value()),
-                              std::end(var.value()));
+                result.insert(std::end(result), std::begin(var.value()), std::end(var.value()));
             } else {
                 result = var.value();
             }
@@ -76,12 +69,10 @@ namespace {
         return result;
     }
 
-    std::vector<std::string> resolveVariable(
-        const std::string &value, const make::Variable::Type type,
-        const std::unordered_map<std::string, std::vector<std::string>>
-            &resolved,
-        const std::unordered_map<std::string, std::vector<make::Variable>>
-            &vars) {
+    std::vector<std::string>
+    resolveVariable(const std::string &value, const make::Variable::Type type,
+                    const std::unordered_map<std::string, std::vector<std::string>> &resolved,
+                    const std::unordered_map<std::string, std::vector<make::Variable>> &vars) {
         const auto varName = make::getVariableName(value);
         if (!varName.has_value()) {
             return {value};
@@ -120,10 +111,8 @@ namespace make {
             std::vector<std::string> values;
 
             for (const auto &value : variable.value()) {
-                const auto resolvedValue =
-                    resolveVariable(value, variable.type(), resolved, vars);
-                values.insert(std::end(values), std::begin(resolvedValue),
-                              std::end(resolvedValue));
+                const auto resolvedValue = resolveVariable(value, variable.type(), resolved, vars);
+                values.insert(std::end(values), std::begin(resolvedValue), std::end(resolvedValue));
             }
 
             if (variable.type() == Variable::Type::Append) {
@@ -137,10 +126,9 @@ namespace make {
         return resolved;
     }
 
-    std::string assignVariables(
-        std::string command,
-        const std::unordered_map<std::string, std::vector<std::string>>
-            &variables) {
+    std::string
+    assignVariables(std::string command,
+                    const std::unordered_map<std::string, std::vector<std::string>> &variables) {
         const auto variableExpressions = getVariableNames(command);
 
         for (const auto &variableExpression : variableExpressions) {
